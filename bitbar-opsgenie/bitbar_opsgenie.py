@@ -14,6 +14,26 @@ import sys
 
 from backports import configparser  # https://pypi.python.org/pypi/configparser
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+
+def requests_retry_session(
+    retries=3,
+    backoff_factor=0.3,
+    session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
 
 
 class MyConfigParser(configparser.ConfigParser):
@@ -38,12 +58,19 @@ def main():
     schedule_api = '%s/v2/schedules' % api
     user_api = '%s/v2/users' % api
 
+    # setup a requests session object:
+    s = requests.Session()
+    # with authentication built-in:
+    s.headers.update(headers)
+    # and with retry logic:
+    s = requests_retry_session(session=s)
+
     print('|image=%s' % (icons['black']))
     print('---')
 
     # fetch all schedules
     payload = {'expand': 'false'}
-    r = requests.get(schedule_api, headers=headers, params=payload)
+    r = s.get(schedule_api, params=payload, timeout=(3.05, 12))
     response = r.json()
     schedules = response['data']
 
@@ -54,13 +81,13 @@ def main():
         schedule_team = schedule.get('ownerTeam').get('name')
 
         payload = {'flat': 'true', 'scheduleIdentifierType': 'id'}
-        r = requests.get(schedule_api + '/%s/on-calls' % schedule_id, headers=headers, params=payload)
+        r = s.get(schedule_api + '/%s/on-calls' % schedule_id, params=payload, timeout=(3.05, 12))
         response = r.json()
         whosoncall = response['data']['onCallRecipients']
         for person in whosoncall:
             if person not in user:
                 payload = {'expand': 'contact'}
-                r = requests.get(user_api + '/' + person, headers=headers, params=payload)
+                r = s.get(user_api + '/' + person, params=payload, timeout=(3.05, 12))
                 response = r.json()
                 user[person] = response['data']
 
@@ -74,7 +101,7 @@ def main():
             'query': 'status:open AND teams:"%s"' % schedule.get('ownerTeam').get('name'),
             'limit': '20', 'sort': 'createdAt', 'order': 'desc'
         }
-        r = requests.get(alerts_api, headers=headers, params=payload)
+        r = s.get(alerts_api, params=payload, timeout=(3.05, 12))
         response = r.json()
         alerts = response['data']
 
