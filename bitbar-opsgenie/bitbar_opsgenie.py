@@ -19,8 +19,8 @@ from requests.packages.urllib3.util.retry import Retry
 
 
 def requests_retry_session(
-    retries=3,
-    backoff_factor=0.3,
+    retries=30,
+    backoff_factor=0.1,
     session=None,
 ):
     session = session or requests.Session()
