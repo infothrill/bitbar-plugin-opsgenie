@@ -91,14 +91,17 @@ def main():
                 response = r.json()
                 user[person] = response['data']
 
-        for person in whosoncall:
-            print('%s %s: %s' % (schedule_team, schedule.get('name'), user[person]['fullName']))
-            for usercontact in (x for x in user[person]['userContacts'] if x['enabled'] is True):
-                print('--%s : %s' % (usercontact['contactMethod'], usercontact['to']))
+        if not whosoncall:
+            print('%s %s: noone' % (schedule_team, schedule.get('name')))
+        else:
+            for person in whosoncall:
+                print('%s %s: %s' % (schedule_team, schedule.get('name'), user[person]['fullName']))
+                for usercontact in (x for x in user[person]['userContacts'] if x['enabled'] is True):
+                    print('--%s : %s' % (usercontact['contactMethod'], usercontact['to']))
 
         # fetch current alerts for this schedule / team
         payload = {
-            'query': 'status:open AND teams:"%s"' % schedule.get('ownerTeam').get('name'),
+            'query': 'status:open AND (responders:"%s" or responders:"%s")' % (schedule.get('name'), schedule.get('ownerTeam').get('name'), ),
             'limit': '20', 'sort': 'createdAt', 'order': 'desc'
         }
         r = s.get(alerts_api, params=payload, timeout=(3.05, 12))
